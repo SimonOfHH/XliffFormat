@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">  
+  <PropertyGroup>
+    <PackageId>XliffFormat</PackageId>
+    <Version>0.0.1</Version>
+    <Authors>Simon Fischer</Authors>
+    <Company>SimonOfHH</Company>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+</Project>
