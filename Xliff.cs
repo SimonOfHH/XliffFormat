@@ -28,32 +28,49 @@ namespace SimonOfHH.XliffFormat
         public void Serialize(string filename)
         {
             var xmlSerializer = new XmlSerializer(typeof(Xliff));
-            using (var writer = new StreamWriter(filename))
+            var settings = new XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "  ",
+                NewLineChars = "\r\n",
+                NewLineHandling = NewLineHandling.Replace
+            };
+            using (var writer = XmlWriter.Create(filename, settings))
             {
                 xmlSerializer.Serialize(writer, this);
                 writer.Close();
             }
         }
-        public void Serialize(string path, int splitIntoParts)
+        public void Serialize(string filename, int maxEntriesPerFile)
         {
-            int totalEntries = this.file.body.group.transunit.Count();
-            int entriesPerPart = Convert.ToInt32(Math.Round((decimal)(totalEntries / splitIntoParts), 0));
-            var newParts = new List<Xliff>();
-            for (int i = 0; i < splitIntoParts; i++)
+            if (this.file.body.group.transunit.Count() <= maxEntriesPerFile)
             {
-                var split = Clone(this);
-                if (i == splitIntoParts - 1)
-                    split.file.body.group.transunit = split.file.body.group.transunit.Skip(i * entriesPerPart).ToArray();
-                else
-                    split.file.body.group.transunit = split.file.body.group.transunit.Skip(i * entriesPerPart).Take(entriesPerPart).ToArray();
-                newParts.Add(split);
+                Serialize(filename);
+                return;
             }
+            Xliff split = Clone(this);
+            var entries = new List<XliffFileBodyGroupTransunit>();
             int counter = 0;
-            foreach (var part in newParts)
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                entries.Add(entry);
+                if (entries.Count() == maxEntriesPerFile)
+                {
+                    counter++;
+                    split.file.body.group.transunit = entries.ToArray();
+                    entries = new List<XliffFileBodyGroupTransunit>();
+                    // Write new object to file
+                    string newFilename = split.SourceFilename.Insert(split.SourceFilename.LastIndexOf("."), String.Format("_{0}", counter));
+                    split.Serialize(newFilename);
+                }
+            }
+            if (entries.Count() > 0)
             {
                 counter++;
-                string newFilename = part.SourceFilename.Insert(part.SourceFilename.LastIndexOf("."), String.Format("_{0}", counter));
-                part.Serialize(newFilename);
+                split.file.body.group.transunit = entries.ToArray();
+                // Write new object to file
+                string newFilename = split.SourceFilename.Insert(split.SourceFilename.LastIndexOf("."), String.Format("_{0}", counter));
+                split.Serialize(newFilename);
             }
         }
         public static Xliff Deserialize(string filename)

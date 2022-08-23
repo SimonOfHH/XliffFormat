@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">  
   <PropertyGroup>
     <PackageId>XliffFormat</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.3</Version>
     <Authors>Simon Fischer</Authors>
     <Company>SimonOfHH</Company>
     <TargetFramework>net6.0</TargetFramework>
