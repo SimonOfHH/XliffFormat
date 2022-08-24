@@ -115,6 +115,28 @@ namespace SimonOfHH.XliffFormat
         }
 
         /// <summary>
+        /// Adds or updates all "trans-unit"-entries in this object with the corresponding entries from "source" where target state = "translated"
+        /// </summary>
+        /// <param name="source">The Xliff-object to get the translated "trans-unit"-entries from.</param>
+        public void UpsertTranslatedEntries(Xliff source)
+        {
+            foreach (var entry in source.file.body.group.transunit.Where(x => x.target.state == "translated"))
+            {
+                var targetEntry = this.file.body.group.transunit.FirstOrDefault(x => x.id == entry.id);
+                if (targetEntry != null)
+                {
+                    var index = this.file.body.group.transunit.ToList().IndexOf(targetEntry);
+                    this.file.body.group.transunit[index] = entry;
+                }
+                else
+                {
+                    var list = this.file.body.group.transunit.ToList();
+                    list.Add(entry);
+                    this.file.body.group.transunit = list.ToArray();
+                }
+            }
+        }
+        /// <summary>
         /// Perform a deep copy of the object via serialization.
         /// </summary>
         /// <typeparam name="T">The type of object being copied.</typeparam>
