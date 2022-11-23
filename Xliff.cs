@@ -101,9 +101,9 @@ namespace SimonOfHH.XliffFormat
             var newEntries = new List<XliffFileBodyGroupTransunit>();
             foreach (var entry in this.file.body.group.transunit)
             {
-                #pragma warning disable CS8625
+#pragma warning disable CS8625
                 entry.alobjecttarget = null;
-                #pragma warning restore CS8625
+#pragma warning restore CS8625
                 bool entryOk = true;
                 entryOk = entryOk && !String.IsNullOrEmpty(entry.source);
                 if (entryOk)
@@ -126,7 +126,24 @@ namespace SimonOfHH.XliffFormat
         {
             SaveEntriesAsCsv(filename, false, false);
         }
-
+        public Dictionary<string, string> ToDictionary()
+        {
+            return ToDictionary(false);
+        }
+        public Dictionary<string, string> ToDictionary(bool includeEmptyTarget)
+        {
+            var dict = new Dictionary<string, string>();
+            foreach (var value in this.file.body.group.transunit)
+            {
+                if (!dict.ContainsKey(value.source))
+                {
+                    dict.Add(value.source, (value.target != null ? value.target.Value : String.Empty));
+                }
+            }
+            if (!includeEmptyTarget)
+                dict = dict.Where(x => x.Value != String.Empty).ToDictionary(x => x.Key, x => x.Value);
+            return dict;
+        }
         public void SaveEntriesAsCsv(string filename, bool distinct, bool splitWords)
         {
             var entries = new List<string>();
@@ -167,9 +184,9 @@ namespace SimonOfHH.XliffFormat
         public static Xliff Merge(Xliff[] xliffs)
         {
             if (xliffs == null)
-            #pragma warning disable CS8603
+#pragma warning disable CS8603
                 return null;
-            #pragma warning restore CS8603
+#pragma warning restore CS8603
 
             var entries = new List<XliffFileBodyGroupTransunit>();
             foreach (var xliff in xliffs)
@@ -303,7 +320,7 @@ namespace SimonOfHH.XliffFormat
                 }
             }
             this.file.body.group.transunit = sourceList.ToArray();
-        }        
+        }
         /// <summary>
         /// Perform a deep copy of the object via serialization.
         /// </summary>
@@ -318,9 +335,9 @@ namespace SimonOfHH.XliffFormat
             }
 
             // Don't serialize a null object, simply return the default for that object
-            #pragma warning disable CS8603
+#pragma warning disable CS8603
             if (ReferenceEquals(source, null)) return default;
-            #pragma warning restore CS8603
+#pragma warning restore CS8603
 
             Stream stream = new MemoryStream();
             IFormatter formatter = new BinaryFormatter();
