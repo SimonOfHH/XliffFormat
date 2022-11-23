@@ -75,7 +75,7 @@ namespace SimonOfHH.XliffFormat
         }
         public static Xliff Deserialize(string filename)
         {
-            var stream = new StreamReader(filename).BaseStream;
+            var stream = new StreamReader(filename, System.Text.Encoding.UTF8).BaseStream;
             var xliff = Deserialize(stream);
             xliff.SourceFilename = filename;
             if (File.ReadAllText(filename).Contains("maxwidth=\"0\""))
@@ -96,10 +96,80 @@ namespace SimonOfHH.XliffFormat
                 return (Xliff)new XmlSerializer(typeof(Xliff)).Deserialize(xmlReader);
 #pragma warning restore CS8600, CS8603
         }
+        public void CleanXliff()
+        {
+            var newEntries = new List<XliffFileBodyGroupTransunit>();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                #pragma warning disable CS8625
+                entry.alobjecttarget = null;
+                #pragma warning restore CS8625
+                bool entryOk = true;
+                entryOk = entryOk && !String.IsNullOrEmpty(entry.source);
+                if (entryOk)
+                    newEntries.Add(entry);
+            }
+            this.file.body.group.transunit = newEntries.ToArray();
+        }
+        public void NormalizeIds()
+        {
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                entry.id = entry.id.ToLower();
+            }
+        }
+        public void ReduceToDistinct()
+        {
+            this.file.body.group.transunit = this.file.body.group.transunit.ToList().GroupBy(x => x.source).Select(g => g.First()).ToArray();
+        }
+        public void SaveEntriesAsCsv(string filename)
+        {
+            SaveEntriesAsCsv(filename, false, false);
+        }
+
+        public void SaveEntriesAsCsv(string filename, bool distinct, bool splitWords)
+        {
+            var entries = new List<string>();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                entries.Add(entry.source);
+            }
+            if (splitWords)
+            {
+                var newEntries = new List<string>();
+                foreach (var entry in entries)
+                {
+                    var split = entry.Split(' ');
+                    foreach (var element in split)
+                    {
+                        if (!String.IsNullOrEmpty(element) && (!new[] { ",", ".", ":", ";", "@", "%", "?", "!" }.Contains(element)))
+                        {
+                            newEntries.Add(element);
+                        }
+                    }
+                }
+                entries = newEntries;
+            }
+            if (distinct) entries = entries.Distinct().ToList();
+            using (var writer = new StreamWriter(filename))
+            {
+                foreach (var entry in entries)
+                {
+                    writer.WriteLine(entry);
+                }
+                writer.Close();
+            }
+        }
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="xliffs">TODO</param>
         public static Xliff Merge(Xliff[] xliffs)
         {
             if (xliffs == null)
+            #pragma warning disable CS8603
                 return null;
+            #pragma warning restore CS8603
 
             var entries = new List<XliffFileBodyGroupTransunit>();
             foreach (var xliff in xliffs)
@@ -122,7 +192,7 @@ namespace SimonOfHH.XliffFormat
         {
             foreach (var entry in source.file.body.group.transunit.Where(x => x.target.state == "translated"))
             {
-                var targetEntry = this.file.body.group.transunit.FirstOrDefault(x => x.id == entry.id);
+                var targetEntry = this.file.body.group.transunit.FirstOrDefault(x => x.id_Clean == entry.id_Clean);
                 if (targetEntry != null)
                 {
                     var index = this.file.body.group.transunit.ToList().IndexOf(targetEntry);
@@ -136,6 +206,104 @@ namespace SimonOfHH.XliffFormat
                 }
             }
         }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="compare">TODO</param>
+        public void RemoveEntriesThatExistInOtherXliff(Xliff compare)
+        {
+            var newEntries = new List<XliffFileBodyGroupTransunit>();
+            var compareList = compare.file.body.group.transunit.ToList();
+            var compareIdList = compareList.Select(x => x.id_Clean).ToList();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                if (!compareIdList.Contains(entry.id_Clean))
+                {
+                    newEntries.Add(entry);
+                }
+            }
+            this.file.body.group.transunit = newEntries.ToArray();
+        }
+
+        public void ReplaceEntriesWithEntriesFromOtherXliff(Xliff compare)
+        {
+            var sourceList = this.file.body.group.transunit.ToList();
+            var compareList = compare.file.body.group.transunit.ToList();
+            var compareIdList = compareList.Select(x => x.id_Clean).ToList();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                if (compareIdList.Contains(entry.id_Clean))
+                {
+                    sourceList[sourceList.IndexOf(entry)] = compareList.First(x => x.id_Clean == entry.id_Clean);
+                }
+            }
+            this.file.body.group.transunit = sourceList.ToArray();
+        }
+        public void ReplaceEntriesWithEntriesFromOtherXliffBasedOnValues(Xliff compare, bool onlyNotTranslated = true)
+        {
+            var sourceList = this.file.body.group.transunit.ToList();
+            //if (onlyNotTranslated)
+            //    sourceList = sourceList.Where(x => x.target.state != "translated").ToList();
+            var compareList = compare.file.body.group.transunit.ToList();
+            var compareIdList = compareList.Select(x => x.id_Clean).ToList();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                if (onlyNotTranslated)
+                    if (entry.target.state == "translated")
+                        continue;
+                var result = compareList.FirstOrDefault(x => x.source == entry.source);
+                if (result != null)
+                {
+                    //sourceList[sourceList.IndexOf(entry)].source = result.source;
+                    sourceList[sourceList.IndexOf(entry)].target = result.target;
+                }
+            }
+            this.file.body.group.transunit = sourceList.ToArray();
+        }
+        public void ReplaceSourceWithTargetFronItherXliff(Xliff compare)
+        {
+            var sourceList = this.file.body.group.transunit.ToList();
+            var compareList = compare.file.body.group.transunit.ToList();
+            var compareIdList = compareList.Select(x => x.id_Clean).ToList();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                if (compareIdList.Contains(entry.id_Clean))
+                {
+                    sourceList[sourceList.IndexOf(entry)].source = compareList.First(x => x.id_Clean == entry.id_Clean).target.Value;
+                }
+            }
+            this.file.body.group.transunit = sourceList.ToArray();
+        }
+        public void ReplaceSourceWithSourceFronItherXliff(Xliff compare)
+        {
+            var sourceList = this.file.body.group.transunit.ToList();
+            var compareList = compare.file.body.group.transunit.ToList();
+            var compareIdList = compareList.Select(x => x.id_Clean).ToList();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                if (compareIdList.Contains(entry.id_Clean))
+                {
+                    sourceList[sourceList.IndexOf(entry)].source = compareList.First(x => x.id_Clean == entry.id_Clean).source;
+                }
+            }
+            this.file.body.group.transunit = sourceList.ToArray();
+        }
+        public void AddTargetFromOtherXliff(Xliff compare)
+        {
+            var sourceList = this.file.body.group.transunit.ToList();
+            var sourceIdList = sourceList.Select(x => x.id_Clean.ToString()).ToList();
+            var compareList = compare.file.body.group.transunit.ToList();
+            var compareIdList = compareList.Select(x => x.id_Clean.ToString()).ToList();
+            foreach (var entry in this.file.body.group.transunit)
+            {
+                if (compareIdList.Contains(entry.id_Clean))
+                {
+                    sourceList[sourceList.IndexOf(entry)].target = compareList.First(x => x.id_Clean == entry.id_Clean).target;
+                }
+            }
+            this.file.body.group.transunit = sourceList.ToArray();
+        }        
         /// <summary>
         /// Perform a deep copy of the object via serialization.
         /// </summary>
@@ -150,7 +318,9 @@ namespace SimonOfHH.XliffFormat
             }
 
             // Don't serialize a null object, simply return the default for that object
+            #pragma warning disable CS8603
             if (ReferenceEquals(source, null)) return default;
+            #pragma warning restore CS8603
 
             Stream stream = new MemoryStream();
             IFormatter formatter = new BinaryFormatter();
@@ -221,6 +391,14 @@ namespace SimonOfHH.XliffFormat
         public XliffFileBodyGroupTransunitNote[] note { get; set; }
         [XmlAttribute]
         public string id { get; set; }
+        public string id_Clean
+        {
+            get { return this.id.ToLower(); }
+        }
+        public bool ShouldSerializeid_Clean()
+        {
+            return false;
+        }
         [XmlAttribute]
         public ushort maxwidth
         {
